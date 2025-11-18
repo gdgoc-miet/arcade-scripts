@@ -169,7 +169,7 @@ echo "${YELLOW}${BOLD}→ Your Website URL: $SERVICE_URL${RESET}"
 # ---------------------------------------
 echo ""
 echo "${BG_GREEN}${BOLD}=================================================================${RESET}"
-echo "${BG_GREEN}${BOLD} 🚀 YOUR TRAEFIK STATIC WEBSITE IS READY! OPEN IT BELOW 🚀 ${RESET}"
+echo "${BG_GREEN}${BOLD} 🚀 YOUR TRAEFIK STATIC WEBSITE IS READY! OPEN IT BELOW TO COMPLETE THE LAB 🚀 ${RESET}"
 echo "${BG_GREEN}${BOLD}=================================================================${RESET}"
 echo ""
 
