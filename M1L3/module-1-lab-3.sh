@@ -56,6 +56,9 @@ gcloud artifacts repositories create my-docker-repo \
     --location="$REGION" \
     --description="Docker repository" || true
 
+echo "${YELLOW}→ Waiting 20 seconds for Artifact Registry to be ready...${RESET}"
+sleep 20
+
 # ---------------------------------------
 # TASK 3 — Configure Docker Authentication
 # ---------------------------------------
