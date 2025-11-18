@@ -21,16 +21,31 @@ BG_GREEN=`tput setab 2`
 echo "${BG_MAGENTA}${BOLD}Starting Module 1 — Lab 1 Execution${RESET}"
 
 # ---------------------------------------
+# FETCH PROJECT ID & REGION DYNAMICALLY
+# ---------------------------------------
+PROJECT_ID=$(gcloud config get-value project)
+REGION=$(gcloud compute project-info describe --project "$PROJECT_ID" \
+  --format="value(commonInstanceMetadata.items[google-compute-default-region])")
+
+# Fallback if region metadata is missing
+if [[ -z "$REGION" ]]; then
+    REGION="us-east1"
+fi
+
+echo "${CYAN}${BOLD}→ PROJECT ID detected: $PROJECT_ID${RESET}"
+echo "${CYAN}${BOLD}→ REGION detected: $REGION${RESET}"
+
+# ---------------------------------------
 # TASK 1 — Set Environment
 # ---------------------------------------
 echo "${GREEN}→ Setting project ID${RESET}"
-gcloud config set project qwiklabs-gcp-01-97b95e9cdf45
+gcloud config set project "$PROJECT_ID" --quiet
 
 echo "${GREEN}→ Setting region${RESET}"
-gcloud config set run/region us-east1
+gcloud config set run/region "$REGION" --quiet
 
 echo "${GREEN}→ Enabling Cloud Run + Artifact Registry APIs${RESET}"
-gcloud services enable run.googleapis.com artifactregistry.googleapis.com
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com --quiet
 
 # ---------------------------------------
 # TASK 2 — Create Static Website
@@ -89,39 +104,40 @@ EOF
 echo "${GREEN}→ Creating Artifact Registry repo${RESET}"
 gcloud artifacts repositories create nginx-static-site \
     --repository-format=docker \
-    --location=us-east1 \
+    --location="$REGION" \
     --description="Docker repository for static website" || true
 
 echo "${GREEN}→ Building Docker image${RESET}"
 docker build -t nginx-static-site .
 
+IMAGE_PATH="$REGION-docker.pkg.dev/$PROJECT_ID/nginx-static-site/nginx-static-site"
+
 echo "${GREEN}→ Tagging Docker image${RESET}"
-docker tag nginx-static-site \
-us-east1-docker.pkg.dev/qwiklabs-gcp-01-97b95e9cdf45/nginx-static-site/nginx-static-site
+docker tag nginx-static-site "$IMAGE_PATH"
 
 echo "${GREEN}→ Configuring Docker auth${RESET}"
-gcloud auth configure-docker us-east1-docker.pkg.dev
+gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
 
 echo "${GREEN}→ Pushing Docker image${RESET}"
-docker push \
-us-east1-docker.pkg.dev/qwiklabs-gcp-01-97b95e9cdf45/nginx-static-site/nginx-static-site
+docker push "$IMAGE_PATH"
 
 # ---------------------------------------
 # TASK 6 — Deploy to Cloud Run
 # ---------------------------------------
 echo "${GREEN}→ Deploying to Cloud Run${RESET}"
 gcloud run deploy nginx-static-site \
-    --image us-east1-docker.pkg.dev/qwiklabs-gcp-01-97b95e9cdf45/nginx-static-site/nginx-static-site \
+    --image "$IMAGE_PATH" \
     --platform managed \
-    --region us-east1 \
-    --allow-unauthenticated
+    --region "$REGION" \
+    --allow-unauthenticated \
+    --quiet
 
 # ---------------------------------------
 # Get URL
 # ---------------------------------------
 SERVICE_URL=$(gcloud run services describe nginx-static-site \
     --platform managed \
-    --region us-east1 \
+    --region "$REGION" \
     --format='value(status.url)')
 
 echo "${YELLOW}${BOLD}→ Your website URL: $SERVICE_URL${RESET}"
@@ -133,7 +149,4 @@ if command -v xdg-open >/dev/null 2>&1; then
   xdg-open "$SERVICE_URL" >/dev/null 2>&1 &
 fi
 
-# ---------------------------------------
-# END
-# ---------------------------------------
 echo "${BG_GREEN}${BOLD}🎉 Congratulations! Lab Completed Successfully.${RESET}"
