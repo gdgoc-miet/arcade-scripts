@@ -156,7 +156,7 @@ echo "${YELLOW}${BOLD}URL: $SERVICE_URL${RESET}"
 echo ""
 
 # Clickable link (Cloud Shell supported)
-printf '\e]8;;'"$SERVICE_URL"'\e\\'"👉 CLICK HERE TO OPEN YOUR STATIC WEBSITE 👈"'\e]8;;\e\\\n'
+printf '\e]8;;'"$SERVICE_URL"'\e\\'"👉 CLICK HERE TO OPEN YOUR STATIC WEBSITE AND COMPLETE YOUR LAB IMPORTANT STEP👈"'\e]8;;\e\\\n'
 echo ""
 
 # For environments where hyperlink doesn't work
