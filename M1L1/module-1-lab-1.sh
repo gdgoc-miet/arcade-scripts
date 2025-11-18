@@ -1,23 +1,41 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
-echo "=============================="
-echo " Running Lab Script (Tasks 1–7)"
-echo "=============================="
+# ---------------------------------------
+# Colors
+# ---------------------------------------
+BLACK=`tput setaf 0`
+RED=`tput setaf 1`
+GREEN=`tput setaf 2`
+YELLOW=`tput setaf 3`
+BLUE=`tput setaf 4`
+MAGENTA=`tput setaf 5`
+CYAN=`tput setaf 6`
+WHITE=`tput setaf 7`
+BOLD=`tput bold`
+RESET=`tput sgr0`
 
-# ------------ TASK 1 ------------
-echo "→ Setting project ID"
-gcloud config set project "PROJECT_ID"
+BG_MAGENTA=`tput setab 5`
+BG_GREEN=`tput setab 2`
 
-echo "→ Setting region"
-gcloud config set run/region "REGION"
+echo "${BG_MAGENTA}${BOLD}Starting Module 1 — Lab 1 Execution${RESET}"
 
-echo "→ Enabling APIs"
+# ---------------------------------------
+# TASK 1 — Set Environment
+# ---------------------------------------
+echo "${GREEN}→ Setting project ID${RESET}"
+gcloud config set project qwiklabs-gcp-01-97b95e9cdf45
+
+echo "${GREEN}→ Setting region${RESET}"
+gcloud config set run/region us-east1
+
+echo "${GREEN}→ Enabling Cloud Run + Artifact Registry APIs${RESET}"
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com
 
-
-# ------------ TASK 2 ------------
-echo "→ Creating index.html"
+# ---------------------------------------
+# TASK 2 — Create Static Website
+# ---------------------------------------
+echo "${GREEN}→ Creating index.html${RESET}"
 cat > index.html <<EOF
 <!DOCTYPE html>
 <html>
@@ -31,9 +49,10 @@ cat > index.html <<EOF
 </html>
 EOF
 
-
-# ------------ TASK 3 ------------
-echo "→ Creating nginx.conf"
+# ---------------------------------------
+# TASK 3 — Create nginx.conf
+# ---------------------------------------
+echo "${GREEN}→ Creating nginx.conf${RESET}"
 cat > nginx.conf <<EOF
 events {}
 http {
@@ -49,9 +68,10 @@ http {
 }
 EOF
 
-
-# ------------ TASK 4 ------------
-echo "→ Creating Dockerfile"
+# ---------------------------------------
+# TASK 4 — Create Dockerfile
+# ---------------------------------------
+echo "${GREEN}→ Creating Dockerfile${RESET}"
 cat > Dockerfile <<EOF
 FROM nginx:latest
 
@@ -63,39 +83,57 @@ EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
 EOF
 
-
-# ------------ TASK 5 ------------
-echo "→ Creating Artifact Registry repo"
+# ---------------------------------------
+# TASK 5 — Build & Push Image
+# ---------------------------------------
+echo "${GREEN}→ Creating Artifact Registry repo${RESET}"
 gcloud artifacts repositories create nginx-static-site \
     --repository-format=docker \
-    --location="REGION" \
+    --location=us-east1 \
     --description="Docker repository for static website" || true
 
-echo "→ Building Docker image"
+echo "${GREEN}→ Building Docker image${RESET}"
 docker build -t nginx-static-site .
 
-echo "→ Tagging image"
-docker tag nginx-static-site "REGION"-docker.pkg.dev/"PROJECT_ID"/nginx-static-site/nginx-static-site
+echo "${GREEN}→ Tagging Docker image${RESET}"
+docker tag nginx-static-site \
+us-east1-docker.pkg.dev/qwiklabs-gcp-01-97b95e9cdf45/nginx-static-site/nginx-static-site
 
-echo "→ Pushing image"
-docker push "REGION"-docker.pkg.dev/"PROJECT_ID"/nginx-static-site/nginx-static-site
+echo "${GREEN}→ Configuring Docker auth${RESET}"
+gcloud auth configure-docker us-east1-docker.pkg.dev
 
+echo "${GREEN}→ Pushing Docker image${RESET}"
+docker push \
+us-east1-docker.pkg.dev/qwiklabs-gcp-01-97b95e9cdf45/nginx-static-site/nginx-static-site
 
-# ------------ TASK 6 ------------
-echo "→ Deploying Cloud Run service"
+# ---------------------------------------
+# TASK 6 — Deploy to Cloud Run
+# ---------------------------------------
+echo "${GREEN}→ Deploying to Cloud Run${RESET}"
 gcloud run deploy nginx-static-site \
-    --image "REGION"-docker.pkg.dev/"PROJECT_ID"/nginx-static-site/nginx-static-site \
+    --image us-east1-docker.pkg.dev/qwiklabs-gcp-01-97b95e9cdf45/nginx-static-site/nginx-static-site \
     --platform managed \
-    --region "REGION" \
+    --region us-east1 \
     --allow-unauthenticated
 
-echo "→ Fetching service URL"
-gcloud run services describe nginx-static-site \
+# ---------------------------------------
+# Get URL
+# ---------------------------------------
+SERVICE_URL=$(gcloud run services describe nginx-static-site \
     --platform managed \
-    --region "REGION" \
-    --format='value(status.url)'
+    --region us-east1 \
+    --format='value(status.url)')
 
+echo "${YELLOW}${BOLD}→ Your website URL: $SERVICE_URL${RESET}"
 
-echo "=============================="
-echo " Script Completed (All Tasks)"
-echo "=============================="
+# ---------------------------------------
+# Auto-open if supported
+# ---------------------------------------
+if command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "$SERVICE_URL" >/dev/null 2>&1 &
+fi
+
+# ---------------------------------------
+# END
+# ---------------------------------------
+echo "${BG_GREEN}${BOLD}🎉 Congratulations! Lab Completed Successfully.${RESET}"
