@@ -1,70 +1,71 @@
 #!/bin/bash
 set -euo pipefail
 
+# ==============================================================
+#   🚀 Module 2 — Lab 1 (Terraform + GCE Instance) — Auto-Retry
+# ==============================================================
+
 echo ""
 echo "=============================================================="
 echo "   🚀 Starting Module 2 — Lab 1 (Terraform + GCE Instance)"
 echo "=============================================================="
 echo ""
 
-# ------------------------------------------------------
-# FETCH PROJECT ID + REGION + ZONE
-# ------------------------------------------------------
-PROJECT_ID=$(gcloud config get-value project)
+# Detect project, region & zone
+PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
 REGION=$(gcloud compute project-info describe --project "$PROJECT_ID" \
-  --format="value(commonInstanceMetadata.items[google-compute-default-region])")
-
+         --format="value(commonInstanceMetadata.items[google-compute-default-region])")
 ZONE=$(gcloud compute project-info describe --project "$PROJECT_ID" \
-  --format="value(commonInstanceMetadata.items[google-compute-default-zone])")
+        --format="value(commonInstanceMetadata.items[google-compute-default-zone])")
 
-# fallback values
-[[ -z "$REGION" ]] && REGION="us-central1"
-[[ -z "$ZONE" ]] && ZONE="us-central1-a"
+REGION=${REGION:-"us-central1"}
+ZONE=${ZONE:-"${REGION}-b"}
 
 echo "→ Project detected : $PROJECT_ID"
 echo "→ Region detected  : $REGION"
 echo "→ Zone detected    : $ZONE"
 echo ""
 
-# ------------------------------------------------------
-# Task 1 — Enable APIs + Verify Tools
-# ------------------------------------------------------
-echo "→ Enabling Artifact Registry API"
-gcloud services enable artifactregistry.googleapis.com --quiet
+# --------------------------------------------------------------
+# AUTO-RETRY FUNCTION FOR ENABLING APIS
+# --------------------------------------------------------------
+enable_api() {
+    API="$1"
+    echo "→ Enabling $API"
 
-echo "→ Enabling Compute Engine API"
-gcloud services enable compute.googleapis.com --quiet
+    for ATTEMPT in {1..3}; do
+        if gcloud services enable "$API" --quiet; then
+            echo "✔ $API enabled successfully"
+            return 0
+        else
+            echo "⚠ Failed to enable $API (attempt $ATTEMPT/3). Retrying in 10 seconds..."
+            sleep 10
+        fi
+    done
 
-echo "→ Verifying Terraform availability"
-terraform version || { echo "Terraform not installed!"; exit 1; }
+    echo "❌ WARNING: Failed to enable $API after multiple attempts."
+    echo "   Continuing script — API might already be enabled."
+}
 
-echo "→ Verifying gcloud installation"
-gcloud version >/dev/null
+# --------------------------------------------------------------
+# ENABLE REQUIRED APIS WITH RETRIES
+# --------------------------------------------------------------
+enable_api "artifactregistry.googleapis.com"
+enable_api "compute.googleapis.com"
 
+# --------------------------------------------------------------
+# TERRAFORM SETUP STARTS BELOW
+# --------------------------------------------------------------
 echo ""
+echo "→ Creating Terraform state bucket: gs://${PROJECT_ID}-tf-state"
+gcloud storage buckets create "gs://${PROJECT_ID}-tf-state" --location=us --quiet || true
 
-# ------------------------------------------------------
-# Task 2 — Create Terraform State Bucket
-# ------------------------------------------------------
-BUCKET_NAME="${PROJECT_ID}-tf-state"
+echo "→ Enabling bucket versioning"
+gsutil versioning set on "gs://${PROJECT_ID}-tf-state" >/dev/null || true
 
-echo "→ Creating Terraform state bucket: gs://$BUCKET_NAME"
-gsutil mb -l "$REGION" "gs://$BUCKET_NAME" || true
+echo "→ Creating Terraform files"
+mkdir -p terraform-gce && cd terraform-gce
 
-echo "→ Enabling versioning"
-gsutil versioning set on "gs://$BUCKET_NAME"
-
-echo ""
-
-# ------------------------------------------------------
-# Task 3 — Create Terraform Files
-# ------------------------------------------------------
-echo "→ Creating Terraform configuration files"
-rm -rf m2l1-terraform
-mkdir m2l1-terraform
-cd m2l1-terraform
-
-# main.tf
 cat > main.tf <<EOF
 terraform {
   required_providers {
@@ -73,21 +74,22 @@ terraform {
       version = "~> 4.0"
     }
   }
+
   backend "gcs" {
-    bucket = "${BUCKET_NAME}"
+    bucket = "${PROJECT_ID}-tf-state"
     prefix = "terraform/state"
   }
 }
 
 provider "google" {
-  project = var.project_id
-  region  = var.region
+  project = "$PROJECT_ID"
+  region  = "$REGION"
 }
 
 resource "google_compute_instance" "default" {
   name         = "terraform-instance"
   machine_type = "e2-micro"
-  zone         = var.zone
+  zone         = "$ZONE"
 
   boot_disk {
     initialize_params {
@@ -102,53 +104,22 @@ resource "google_compute_instance" "default" {
 }
 EOF
 
-# variables.tf
-cat > variables.tf <<EOF
-variable "project_id" {
-  type        = string
-  description = "Google Cloud Project ID"
-  default     = "${PROJECT_ID}"
-}
-
-variable "region" {
-  type        = string
-  description = "Deployment region"
-  default     = "${REGION}"
-}
-
-variable "zone" {
-  type        = string
-  description = "Deployment zone"
-  default     = "${ZONE}"
-}
-EOF
-
-echo ""
-
-# ------------------------------------------------------
-# Task 4 — Terraform Init/Plan/Apply
-# ------------------------------------------------------
 echo "→ Initializing Terraform"
 terraform init -input=false
 
 echo "→ Running terraform plan"
-terraform plan -input=false -out=tfplan
+terraform plan -out=tfplan -input=false
 
-echo "→ Applying Terraform (non-interactive)"
-terraform apply -auto-approve tfplan
+echo "→ Applying Terraform configuration"
+terraform apply -input=false -auto-approve tfplan
 
 echo ""
-echo "→ Instance deployed! Verifying..."
-gcloud compute instances list --filter="name=terraform-instance"
+echo "✔ Instance created. Showing VM list:"
+gcloud compute instances list
 
-# ------------------------------------------------------
-# Task 6 — Destroy Infra
-# ------------------------------------------------------
 echo ""
 echo "→ Destroying Terraform-managed resources (cleanup)"
-terraform destroy -auto-approve
+terraform destroy -auto-approve -input=false
 
 echo ""
-echo "=============================================================="
-echo "  🎉 Module 2 — Lab 1 Completed Successfully!"
-echo "=============================================================="
+echo "🎉 Module 2 — Lab 1 Completed Successfully!"
