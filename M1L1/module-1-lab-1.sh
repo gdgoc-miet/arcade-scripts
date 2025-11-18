@@ -143,10 +143,25 @@ SERVICE_URL=$(gcloud run services describe nginx-static-site \
 echo "${YELLOW}${BOLD}→ Your website URL: $SERVICE_URL${RESET}"
 
 # ---------------------------------------
-# Auto-open if supported
+# Display BIG FINAL MESSAGE + CLICKABLE URL
 # ---------------------------------------
-if command -v xdg-open >/dev/null 2>&1; then
-  xdg-open "$SERVICE_URL" >/dev/null 2>&1 &
-fi
+echo ""
+echo "${BG_GREEN}${BOLD}=============================================================${RESET}"
+echo "${BG_GREEN}${BOLD}   🚀 YOUR WEBSITE IS READY! OPEN IT IN A NEW TAB BELOW 🚀   ${RESET}"
+echo "${BG_GREEN}${BOLD}=============================================================${RESET}"
+echo ""
 
-echo "${BG_GREEN}${BOLD}🎉 Congratulations! Lab Completed Successfully.${RESET}"
+# Show plain URL (copy/paste option)
+echo "${YELLOW}${BOLD}URL: $SERVICE_URL${RESET}"
+echo ""
+
+# Clickable link (Cloud Shell supported)
+printf '\e]8;;'"$SERVICE_URL"'\e\\'"👉 CLICK HERE TO OPEN YOUR STATIC WEBSITE 👈"'\e]8;;\e\\\n'
+echo ""
+
+# For environments where hyperlink doesn't work
+echo "${CYAN}If clicking doesn't work, manually open the URL in a new browser tab.${RESET}"
+echo ""
+
+echo "${BG_GREEN}${BOLD}🎉 Congratulations! Lab Completed Successfully. 🎉${RESET}"
+
